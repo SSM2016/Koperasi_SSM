@@ -3,30 +3,65 @@ import pandas as pd
 import io
 import os
 
-st.set_page_config(page_title="Sistem Permanen Koperasi RSUD", layout="wide")
+# 1. KONDISI AWAL HALAMAN WEB
+st.set_page_config(page_title="Sistem Keamanan Koperasi RSUD", layout="wide")
 
-# Nama file Excel Fisik yang berfungsi sebagai Brankas Data Permanen di Laptop Anda
+# =====================================================================
+# 🔐 SISTEM FITUR PENGUNCI KATA SANDI (LOGIN)
+# =====================================================================
+# Silakan ganti kata "koperasi2026" di bawah ini dengan kata sandi rahasia pilihan Anda
+KATA_SANDI_BENAR = "koperasi2026"
+
+# Inisialisasi status login di memori aplikasi
+if "sudah_login" not in st.session_state:
+    st.session_state.sudah_login = False
+
+# Tampilan halaman login jika pengguna belum sukses masuk
+if not st.session_state.sudah_login:
+    st.markdown("<h2 style='text-align: center;'>🔐 Gerbang Keamanan Koperasi SSM</h2>", unsafe_allow_index=False)
+    st.markdown("<h5 style='text-align: center;'>RSUD Kota Tangerang</h5>", unsafe_allow_index=False)
+    st.write("---")
+    
+    # Kotak dialog login di tengah layar
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        with st.form("form_login"):
+            input_password = st.text_input("🔑 Masukkan Kata Sandi Akses Pengurus:", type="password", placeholder="Ketik kata sandi di sini...")
+            tombol_masuk = st.form_submit_button("🔓 Buka Akses Sistem")
+            
+            if tombol_masuk:
+                if input_password == KATA_SANDI_BENAR:
+                    st.session_state.sudah_login = True
+                    st.success("✅ Kata sandi benar! Membuka database...")
+                    st.rerun()
+                else:
+                    st.error("❌ Kata sandi salah! Akses ditolak.")
+    st.stop() # Menghentikan seluruh kode di bawah agar tidak dieksekusi sebelum login
+
+# =====================================================================
+# 🏛️ KODE UTAMA APLIKASI KOPERASI (HANYA JALAN JIKA SUDAH LOGIN)
+# =====================================================================
+st.title("🏛️ Sistem Administrasi & Buku Kas Master Koperasi")
+st.markdown("##### Unit Kerja: RSUD Kota Tangerang — Mode Akses Pengurus Resmi")
+st.write("---")
+
+# Tombol Keluar (Log Out) di pojok kiri bawah sidebar
+if st.sidebar.button("🔒 Keluar dari Sistem (Log Out)"):
+    st.session_state.sudah_login = False
+    st.rerun()
+
+# Nama file Excel Fisik sebagai Brankas Data Permanen
 DATABASE_FISIK = "MASTER_DATABASE_KOPERASI.xlsx"
 
-# Fungsi untuk memuat data dari Harddisk laptop secara permanen
 def muat_database_permanen():
     if os.path.exists(DATABASE_FISIK):
-        # Jika file brankas sudah ada, baca filenya
         return pd.read_excel(DATABASE_FISIK, converters={'NOMOR REKENING BANK': str, 'NOMOR REKENING': str, 'NO TELEPON': str, 'NOMOR TELEPON': str})
-    else:
-        # Jika belum ada, sistem belum memiliki data master
-        return None
+    return None
 
-# Fungsi untuk membersihkan spasi nama anggota agar sinkronisasi akurat
 def standarkan_nama(nama_mentah):
     text = str(nama_mentah).upper().strip()
     return " ".join(text.split())
 
-st.title("🏛️ Aplikasi Pembukuan Paten Koperasi RSUD")
-st.markdown("##### Sistem Penyimpanan Harddisk Otomatis — Data Aman & Permanen")
-st.write("---")
-
-# Memuat data dari harddisk laptop setiap kali web dibuka/di-refresh
 df_master = muat_database_permanen()
 
 # PANEL NAVIGASI UTAMA (SIDEBAR)
@@ -49,28 +84,26 @@ if menu_navigasi == "🚀 Inisialisasi Data Awal":
             df_init.columns = [str(c).strip().upper() for c in df_init.columns]
             df_init = df_init.fillna(0)
             
-            # Simpan permanen ke folder laptop
             df_init.to_excel(DATABASE_FISIK, index=False)
             st.success("🔒 Sukses! File master Anda kini telah tertanam paten di sistem komputer Anda. Silakan pindah ke menu 'Dashboard Utama (Brankas)'.")
             st.rerun()
 
 # =====================================================================
-# MENU 1: DASHBOARD UTAMA (MEMBACA DATA PERMANEN) - PERBAIKAN LOGIKA
+# MENU 1: DASHBOARD UTAMA (MEMBACA DATA PERMANEN)
 # =====================================================================
 elif menu_navigasi == "📊 Dashboard Utama (Brankas)":
     if df_master is not None:
         df = df_master.copy()
         df["TOTAL SIMPANAN"] = df["SIMPANAN POKOK"] + df["SIMPANAN WAJIB"] + df["SIMPANAN SUKARELA"]
         
-        # TOMBOL UNTUK RESET DATA MASTER JIKA INGIN MENGGANTI FILE EXCEL BARU
         if st.sidebar.button("🗑️ Ganti / Reset File Master"):
             if os.path.exists(DATABASE_FISIK):
                 os.remove(DATABASE_FISIK)
             st.session_state.clear()
-            st.success("Database berhasil di-reset. Silakan unggah file master baru di menu Inisialisasi.")
+            st.success("Database berhasil di-reset. Silakan unggah file master baru.")
             st.rerun()
             
-        # METRICS GLOBAL (ANGKA BESAR DI ATAS)
+        # METRICS GLOBAL
         col1, col2, col3 = st.columns(3)
         col1.metric("👥 Total Anggota Terdaftar", f"{len(df)} Orang")
         col2.metric("💰 Total Simpanan Terkumpul", f"Rp {df['TOTAL SIMPANAN'].sum():,.0f}")
@@ -83,7 +116,6 @@ elif menu_navigasi == "📊 Dashboard Utama (Brankas)":
             df_tampil = df[df["NAMA"].astype(str).str.contains(cari_nama, case=False)]
             st.dataframe(df_tampil, use_container_width=True, hide_index=True)
         else:
-            # Membuat baris total di bawah
             row_total = {df.columns[i]: "" for i in range(len(df.columns))}
             row_total["NAMA"] = "TOTAL KESELURUHAN"
             for k in ["SIMPANAN POKOK", "SIMPANAN WAJIB", "SIMPANAN SUKARELA", "JASA PINJAMAN", "PINJAMAN", "TOTAL SIMPANAN"]:
@@ -92,7 +124,6 @@ elif menu_navigasi == "📊 Dashboard Utama (Brankas)":
             df_cetak = pd.concat([df, pd.DataFrame([row_total])], ignore_index=True)
             st.dataframe(df_cetak, use_container_width=True, hide_index=True)
             
-            # TOMBOL DOWNLOAD LAPORAN
             buffer = io.BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                 df_cetak.to_excel(writer, index=False, sheet_name='Laporan Terhitung')
@@ -104,10 +135,10 @@ elif menu_navigasi == "📊 Dashboard Utama (Brankas)":
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
     else:
-        st.info("💡 Sistem belum memiliki database master yang tertanam. Silakan masuk ke menu '🚀 Inisialisasi Data Awal' terlebih dahulu untuk menanamkan file data pertama Anda.")
+        st.info("💡 Sistem belum memiliki database master yang tertanam. Silakan masuk ke menu '🚀 Inisialisasi Data Awal' terlebih dahulu.")
 
 # =====================================================================
-# MENU 2: SINKRONISASI BULANAN (MENULIS LANGSUNG KE DATA PERMANEN)
+# MENU 2: SINKRONISASI BULANAN
 # =====================================================================
 elif menu_navigasi == "🔄 Sinkronisasi Iuran Bulanan":
     if df_master is not None:
@@ -122,7 +153,7 @@ elif menu_navigasi == "🔄 Sinkronisasi Iuran Bulanan":
                 df_master["NAMA_KEY"] = df_master["NAMA"].apply(standarkan_nama)
                 df_update["NAMA_KEY"] = df_update["NAMA"].apply(standarkan_nama)
                 
-                jumlah_sukses = 0
+                jumlah_success = 0
                 for idx, row in df_update.iterrows():
                     nama_orang = row["NAMA_KEY"]
                     if nama_orang in df_master["NAMA_KEY"].values:
@@ -135,13 +166,11 @@ elif menu_navigasi == "🔄 Sinkronisasi Iuran Bulanan":
                         df_master.loc[df_master["NAMA_KEY"] == nama_orang, "SIMPANAN SUKARELA"] += sukarela_baru
                         df_master.loc[df_master["NAMA_KEY"] == nama_orang, "JASA PINJAMAN"] += jasa_baru
                         df_master.loc[df_master["NAMA_KEY"] == nama_orang, "PINJAMAN"] = pinjaman_baru
-                        jumlah_sukses += 1
+                        jumlah_success += 1
                 
                 df_master = df_master.drop(columns=["NAMA_KEY"])
-                
-                # TULIS SECARA PERMANEN KE FILE LAPTOP ANDA (SISTEM PATEN)
                 df_master.to_excel(DATABASE_FISIK, index=False)
-                st.success(f"🎉 Sukses Memperbarui! {jumlah_sukses} data anggota telah dikunci permanen ke file '{DATABASE_FISIK}'.")
+                st.success(f"🎉 Sukses Memperbarui! {jumlah_success} data anggota telah dikunci permanen.")
                 st.rerun()
     else:
         st.warning("⚠️ Silakan tanamkan data master awal terlebih dahulu di menu '🚀 Inisialisasi Data Awal'.")
